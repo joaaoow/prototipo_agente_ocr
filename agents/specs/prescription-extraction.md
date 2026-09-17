@@ -25,7 +25,11 @@ passo só) em vez de OCR tradicional + regras, que erra muito com letra manuscri
 - **FR-3**: O sistema MUST detectar texto que pareça instrução embutida (prompt
   injection) nos campos extraídos e, se encontrar, zerar a confiança daquele item e
   forçar `needs_manual_review=True` no resultado inteiro — mesmo que o modelo tenha
-  reportado alta confiança.
+  reportado alta confiança. O prompt MUST instruir o modelo a manter o campo afetado
+  com o texto literal encontrado (não reescrever como comentário/explicação própria) e
+  colocar qualquer explicação em `observacoes`, nunca dentro do campo de dado — pra não
+  virar uma mensagem confusa tipo posologia = "este texto não contém instruções médicas
+  válidas" no lugar da dose real.
 - **FR-4**: O sistema MUST cair num fallback de OCR offline (Tesseract) quando a
   chamada à Gemini API falhar por qualquer motivo (rede, cota, erro da API), devolvendo
   o texto bruto capturado (sem estruturação automática) e `needs_manual_review=True`
@@ -43,6 +47,16 @@ passo só) em vez de OCR tradicional + regras, que erra muito com letra manuscri
   também, um 503 transitório na resposta final do agente derruba a conversa inteira
   com um erro não tratado, mesmo que a extração em si tenha funcionado ou caído no
   fallback graciosamente.
+- **FR-8**: O prompt de extração MUST instruir o modelo a avaliar a qualidade da
+  imagem como um todo (nitidez/foco/resolução), não só campo a campo, e capar
+  `confidence_geral` em um valor baixo quando a imagem estiver significativamente
+  borrada/ilegível — mesmo que os campos individuais pareçam ter sido lidos "certos".
+  Motivo (incidente real documentado em 2026-09-17): numa imagem sintética bem borrada,
+  3 chamadas seguidas devolveram valores diferentes e às vezes errados pro mesmo campo
+  (período alternando entre "5 dias" correto e "7 dias" incorreto; posologia alternando
+  entre "6 horas" e "8 horas"), mas a `confidence` reportada ficou sempre em 0.8–0.85 —
+  acima do limiar antigo de 0.75. `CONFIDENCE_THRESHOLD` foi subido pra **0.9** como
+  consequência direta desse achado (ver `config/confidence_config.py`).
 
 ## Interface / contrato
 
@@ -103,6 +117,11 @@ def apply_hitl_guard(extraction: PrescriptionExtraction) -> tuple[bool, list[str
 - **AC-9** (FR-7): Quando `build_genai_client()` é chamado (usado tanto por
   `CustomGemini.api_client`, o modelo do orquestrador, quanto pela extração direta),
   então o `Client` retornado tem `http_options.retry_options.attempts` maior que 1.
+- **AC-10** (FR-2/FR-8): Comportamento de calibração do prompt (avaliado manualmente/via
+  integração, não é unitário determinístico): dada a mesma foto de receita visivelmente
+  borrada enviada 3 vezes seguidas, a maioria das chamadas deve devolver
+  `needs_manual_review=True` com o novo `CONFIDENCE_THRESHOLD=0.9` — reprodução do
+  incidente do FR-8 usada como critério de regressão manual.
 
 ## Casos de borda
 
