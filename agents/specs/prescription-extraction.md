@@ -36,8 +36,13 @@ passo só) em vez de OCR tradicional + regras, que erra muito com letra manuscri
   round-robin, pra caber no tier gratuito do plano estudante.
 - **FR-7**: O sistema MUST tentar novamente (retry com backoff) chamadas à Gemini API
   que falharem com erro transitório (408/429/500/502/503/504) antes de considerar a
-  chamada uma falha e cair no fallback Tesseract — o SDK `google-genai` não tenta de
-  novo por padrão se `retry_options` não for configurado explicitamente.
+  chamada uma falha — o SDK `google-genai` não tenta de novo por padrão se
+  `retry_options` não for configurado explicitamente. Isso vale tanto pra chamada de
+  extração (`extraction_service`) quanto pro **próprio modelo do agente orquestrador**
+  (`root_agent`/`CustomGemini`): sem retry configurado no client do orquestrador
+  também, um 503 transitório na resposta final do agente derruba a conversa inteira
+  com um erro não tratado, mesmo que a extração em si tenha funcionado ou caído no
+  fallback graciosamente.
 
 ## Interface / contrato
 
@@ -95,6 +100,9 @@ def apply_hitl_guard(extraction: PrescriptionExtraction) -> tuple[bool, list[str
 - **AC-8** (FR-7): Quando `_extract_with_gemini` monta a `GenerateContentConfig`, então
   `http_options.retry_options.attempts` é maior que 1 (retry habilitado, não o
   comportamento padrão do SDK de tentar só uma vez).
+- **AC-9** (FR-7): Quando `build_genai_client()` é chamado (usado tanto por
+  `CustomGemini.api_client`, o modelo do orquestrador, quanto pela extração direta),
+  então o `Client` retornado tem `http_options.retry_options.attempts` maior que 1.
 
 ## Casos de borda
 
