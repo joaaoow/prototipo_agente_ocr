@@ -1,4 +1,4 @@
-"""Testa services/prescription/extraction_service.py — spec: specs/prescription-extraction.md (AC-1, AC-5, AC-6)."""
+"""Testa services/prescription/extraction_service.py — spec: specs/prescription-extraction.md (AC-1, AC-5, AC-6, AC-8)."""
 
 from unittest.mock import MagicMock, patch
 
@@ -67,6 +67,29 @@ def test_extract_prescription_fallback_does_not_raise_when_tesseract_also_fails_
     assert result.needs_manual_review is True
     assert result.data.medicamentos == []
     assert result.data.observacoes is not None
+
+
+def test_extract_prescription_retries_transient_errors_ac8():
+    """google-genai não tenta de novo por padrão se retry_options não for passado
+    explicitamente — sem isso, todo 503 de alta demanda vira fallback na primeira falha."""
+    fake_extraction = PrescriptionExtraction(
+        medicamentos=[
+            MedicationItem(medicamento="Dipirona", dose="500mg", posologia="1 cp 8/8h", periodo="5 dias", confidence=0.9)
+        ],
+        confidence_geral=0.9,
+    )
+    client = _fake_gemini_client(fake_extraction)
+
+    with patch(
+        "services.prescription.extraction_service.build_genai_client",
+        return_value=client,
+    ):
+        extract_prescription(b"fake-image-bytes")
+
+    _, kwargs = client.models.generate_content.call_args
+    retry_options = kwargs["config"].http_options.retry_options
+    assert retry_options is not None
+    assert retry_options.attempts > 1
 
 
 def test_extract_prescription_falls_back_when_gemini_returns_unparseable_response():

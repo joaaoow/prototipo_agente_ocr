@@ -34,6 +34,10 @@ passo só) em vez de OCR tradicional + regras, que erra muito com letra manuscri
   `confidence`/`confidence_geral` na resposta ao usuário — só a conclusão qualitativa.
 - **FR-6**: O sistema MUST revezar entre múltiplas chaves de API (`GOOGLE_API_KEYS`) em
   round-robin, pra caber no tier gratuito do plano estudante.
+- **FR-7**: O sistema MUST tentar novamente (retry com backoff) chamadas à Gemini API
+  que falharem com erro transitório (408/429/500/502/503/504) antes de considerar a
+  chamada uma falha e cair no fallback Tesseract — o SDK `google-genai` não tenta de
+  novo por padrão se `retry_options` não for configurado explicitamente.
 
 ## Interface / contrato
 
@@ -88,6 +92,9 @@ def apply_hitl_guard(extraction: PrescriptionExtraction) -> tuple[bool, list[str
   não foi possível.
 - **AC-7** (FR-6): Dado `GOOGLE_API_KEYS="k1,k2,k3"`, quando `next_api_key()` é chamado
   4 vezes seguidas, então a sequência é `k1, k2, k3, k1` (round-robin).
+- **AC-8** (FR-7): Quando `_extract_with_gemini` monta a `GenerateContentConfig`, então
+  `http_options.retry_options.attempts` é maior que 1 (retry habilitado, não o
+  comportamento padrão do SDK de tentar só uma vez).
 
 ## Casos de borda
 
