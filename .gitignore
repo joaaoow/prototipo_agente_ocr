@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Segredos / ambiente local
+.env
+.env.*
+!.env.example
+
+# Runtime do ADK (gerado localmente por `adk web`)
+.adk/
+
+# Editor / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

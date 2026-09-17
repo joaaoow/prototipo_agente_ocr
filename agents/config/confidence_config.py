@@ -1,0 +1,3 @@
+import os
+
+CONFIDENCE_THRESHOLD = float(os.getenv("PRESCRIPTION_CONFIDENCE_THRESHOLD", "0.75"))
